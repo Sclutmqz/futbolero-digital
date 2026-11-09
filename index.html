@@ -73,7 +73,7 @@ const choices={};const render=()=>{document.getElementById('games').innerHTML=ga
  const GAS_URL='https://script.google.com/macros/s/AKfycbyGJv1JlM7bK7kyrIHyEZxqoswzvslOwoxQiPbKX9n2abwOvSPPnCB_STrcdn9O7kK5/exec';
  const channel='futbolero-v1',modal=document.getElementById('fd-modal');
  const $=id=>document.getElementById(id);
- let registering=false,session=null,bridgeReady=false;
+ let registering=false,session=null,bridgeReady=false,bridgeWindow=null,bridgeOrigin=null;
  const pending=new Map();
  function message(t,ok=false){const el=$('fd-msg');el.textContent=t;el.classList.toggle('ok',ok)}
  function sessionMessage(t){$('fd-session-msg').textContent=t}
@@ -98,15 +98,15 @@ const choices={};const render=()=>{document.getElementById('games').innerHTML=ga
   return new Promise((resolve,reject)=>{
    const id=crypto.randomUUID();const timeout=setTimeout(()=>{pending.delete(id);reject(Error('Tiempo de espera agotado'))},25000);
    pending.set(id,{resolve,reject,timeout});
-   $('fd-bridge').contentWindow.postMessage({channel,id,action,args},'*');
+   bridgeWindow.postMessage({channel,id,action,args},bridgeOrigin);
   });
  }
  if(GAS_URL.startsWith('https://script.google.com/'))$('fd-bridge').src=GAS_URL;
  window.addEventListener('message',event=>{
   if(!GAS_URL.startsWith('https://')||!event.data||event.data.channel!==channel)return;
   // Apps Script HTML Service uses a googleusercontent.com iframe sandbox.
-  if(event.source!==$('fd-bridge').contentWindow)return;
-  if(event.data.ready){bridgeReady=true;const saved=sessionStorage.getItem('fd_session');if(saved){try{const v=JSON.parse(saved);api('me',{token:v.token}).then(r=>{session={token:v.token,user:r.user};updateSession()}).catch(()=>sessionStorage.removeItem('fd_session'))}catch(_){}}return}
+  if(!/^https:\/\/[a-z0-9-]+(?:-|\.)script\.googleusercontent\.com$/.test(event.origin))return;
+  if(event.data.ready){bridgeWindow=event.source;bridgeOrigin=event.origin;bridgeReady=true;const saved=sessionStorage.getItem('fd_session');if(saved){try{const v=JSON.parse(saved);api('me',{token:v.token}).then(r=>{session={token:v.token,user:r.user};updateSession()}).catch(()=>sessionStorage.removeItem('fd_session'))}catch(_){}}return}
   const p=pending.get(event.data.id);if(!p)return;
   clearTimeout(p.timeout);pending.delete(event.data.id);
   event.data.ok?p.resolve(event.data.result):p.reject(Error(event.data.error||'Error de servidor'));
